@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Your feedback – NYU Women's Lacrosse</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<header><img src="../assets/logo.png" alt="NYU Women's Lacrosse"><h1>Feedback Envelope</h1></header>
+<main>
+<h1>$player_name</h1>
+<div class="picker" id="picker">
+<label>Season <select id="season"></select></label>
+<label>Date <select id="date"></select></label>
+</div>
+$entries_html
+</main>
+<script>
+// Entries are newest first. Show the newest by default; the dropdowns switch between them.
+(function () {
+  var secs = [].slice.call(document.querySelectorAll(".entry"));
+  var seasonSel = document.getElementById("season"), dateSel = document.getElementById("date");
+  var seasons = [];
+  secs.forEach(function (s) { if (seasons.indexOf(s.dataset.season) < 0) seasons.push(s.dataset.season); });
+
+  function option(value, text) {
+    var o = document.createElement("option"); o.value = value; o.textContent = text; return o;
+  }
+  function show() {
+    secs.forEach(function (s) {
+      s.hidden = !(s.dataset.season === seasonSel.value && s.dataset.date === dateSel.value);
+    });
+  }
+  function fillDates() {
+    dateSel.textContent = "";
+    secs.filter(function (s) { return s.dataset.season === seasonSel.value; })
+        .forEach(function (s) { dateSel.appendChild(option(s.dataset.date, s.dataset.display)); });
+    show();
+  }
+  seasons.forEach(function (s) { seasonSel.appendChild(option(s, s)); });
+  seasonSel.addEventListener("change", fillDates);
+  dateSel.addEventListener("change", show);
+  fillDates();
+  document.getElementById("picker").style.display = "flex";
+})();
+</script>
+</body>
+</html>

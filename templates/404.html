@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Invalid code – NYU Women's Lacrosse</title>
+<style>$css</style>
+</head>
+<body>
+<header><img src="$logo" alt="NYU Women's Lacrosse"><h1>Feedback Envelope</h1></header>
+<main>
+<div class="card">
+<h2>Invalid code</h2>
+<p>We couldn't find an envelope for that code. Double check your input: codes are case-sensitive, so make sure you copied the whole thing with no extra spaces.</p>
+<p style="margin-top:1rem"><a class="btn" id="back" href="$home">Try again</a></p>
+</div>
+</main>
+<script>
+// This page is served at whatever URL was missing, so work out the site root from the path.
+var p = location.pathname, i = p.indexOf("/f/");
+if (i >= 0) document.getElementById("back").href = p.slice(0, i + 1);
+</script>
+</body>
+</html>

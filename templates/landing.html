@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Feedback Envelope – NYU Women's Lacrosse</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header><img src="assets/logo.png" alt="NYU Women's Lacrosse"><h1>Feedback Envelope</h1></header>
+<main>
+<div class="card">
+<h2>Open your envelope</h2>
+<form id="f">
+<input type="text" id="code" placeholder="Enter your code" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+<button type="submit">Open</button>
+</form>
+<div class="err" id="err"></div>
+</div>
+</main>
+<script>
+document.getElementById("f").addEventListener("submit", function (e) {
+  e.preventDefault();
+  var code = document.getElementById("code").value.trim();
+  if (!/^[A-Za-z0-9_-]{8,}$/.test(code)) {
+    document.getElementById("err").textContent = "That code doesn't look right.";
+    return;
+  }
+  window.location.href = "f/" + code + ".html";
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+.env
+.venv/
+__pycache__/
+site/
+data/
+*.csv
+!sample.csv
+*.html
+!templates/*.html
+sources.json
+!sources.example.json
+!sample_*.csv
