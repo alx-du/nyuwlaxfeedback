@@ -9,8 +9,8 @@
 </head>
 <body>
 <header><img src="assets/logo.png" alt="NYU Women's Lacrosse"><h1>Feedback Envelope</h1></header>
-<main>
-<div class="card">
+<main id="main">
+<div class="card" id="gate">
 <h2>Open your envelope</h2>
 <form id="f">
 <input type="text" id="code" placeholder="Enter your code" autocomplete="off" autocapitalize="off" spellcheck="false" required>
@@ -18,16 +18,40 @@
 </form>
 <div class="err" id="err"></div>
 </div>
+<div id="dash" hidden></div>
 </main>
+<script src="assets/dashboard.js"></script>
 <script>
-document.getElementById("f").addEventListener("submit", function (e) {
+// A player code (five letters + three digits) opens that player's page. Anything else is tried as the
+// staff passphrase: if it decrypts staff.json, the dashboard is shown right here.
+var main = document.getElementById("main"), err = document.getElementById("err");
+
+async function openDashboard(pass) {
+  try {
+    var res = await fetch("staff.json");
+    if (!res.ok) return false;
+    var data = await Dash.decrypt(await res.json(), pass);
+  } catch (_) { return false; }
+  document.getElementById("gate").hidden = true;
+  var d = document.getElementById("dash"); d.hidden = false;
+  main.classList.add("wide");
+  Dash.render(d, data);
+  return true;
+}
+
+document.getElementById("f").addEventListener("submit", async function (e) {
   e.preventDefault();
+  err.textContent = "";
   var code = document.getElementById("code").value.trim();
-  if (!/^[A-Za-z0-9_-]{8,}$/.test(code)) {
-    document.getElementById("err").textContent = "That code doesn't look right.";
-    return;
+  if (!code) return;
+  var isPlayerCode = /^[a-z]{5}[0-9]{3}$/i.test(code);
+  var url = "f/" + code.toLowerCase() + ".html";
+  if (isPlayerCode) {
+    try { if ((await fetch(url, { method: "HEAD" })).ok) { window.location.href = url; return; } } catch (_) {}
   }
-  window.location.href = "f/" + code + ".html";
+  if (await openDashboard(code)) return;
+  if (isPlayerCode) { window.location.href = url; return; }  // shows the friendly "invalid code" page
+  err.textContent = "Invalid code. Double check your input.";
 });
 </script>
 </body>

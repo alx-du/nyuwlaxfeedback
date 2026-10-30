@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Build the feedback site: one private page per player plus an encrypted staff dashboard.
 
-Each feedback entry is one sheet tab tagged with a season and a date. List them in
-sources.json (or the SHEET_SOURCES env var):
+Feedback comes from published sheet tabs listed in sources.json (or the SHEET_SOURCES env var):
   [{"season": "2026-2027", "date": "2026-10-25", "label": "vs SHU", "csv": "<url or path>"}]
+or, to pick up every dated tab of a published document automatically (tab name = the date):
+  [{"document": "<published document link>"}]
+A tab can hold many dates: add Date (and optional Season, Label) columns and append rows for each
+new entry. Season/date/label in the source are only the defaults for rows that leave them blank.
 
 Usage:
   python generate.py                                   # reads sources.json
@@ -17,6 +20,7 @@ import html
 import io
 import json
 import os
+import re
 import secrets
 import shutil
 import sys
@@ -78,27 +82,77 @@ def fetch_csv(location):
     return Path(location).read_text(encoding="utf-8-sig")
 
 
-def read_entry(source):
-    for key in ("season", "date", "csv"):
-        if not source.get(key):
-            sys.exit(f"Source is missing '{key}': {source}")
+def parse_date(text, required=True):
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%m-%d-%Y", "%m-%d-%y", "%m.%d.%Y", "%m.%d.%y",
+                "%B %d, %Y", "%b %d, %Y"):
+        try:
+            return datetime.datetime.strptime(text.strip(), fmt).date().isoformat()
+        except ValueError:
+            pass
+    if required:
+        sys.exit(f"Can't read the date '{text}'. Use YYYY-MM-DD or M/D/YYYY.")
+    return None
+
+
+def expand_sources(sources):
+    """A source with "document" (the published-document link) turns into one source per tab.
+    Each tab's name is its date, e.g. a tab named 10/27/26. Tabs whose name isn't a date are skipped."""
+    out = []
+    for s in sources:
+        if "document" not in s:
+            out.append(s)
+            continue
+        base = s["document"].split("/pub")[0].rstrip("/")
+        page = fetch_csv(base + "/pubhtml")
+        tabs = re.findall(r'items\.push\(\{name: "((?:[^"\\]|\\.)*)", pageUrl: "[^"]*", gid: "(\d+)"', page)
+        if not tabs:
+            sys.exit("Couldn't list the tabs. Is the whole document published (File > Share > Publish to web)?")
+        found = 0
+        for raw_name, gid in tabs:
+            name = json.loads(f'"{raw_name}"')
+            date = parse_date(name, required=False)
+            if not date:
+                print(f"Skipping tab '{name}': its name isn't a date")
+                continue
+            found += 1
+            out.append({"csv": f"{base}/pub?gid={gid}&single=true&output=csv", "date": date,
+                        "season": s.get("season", ""), "label": s.get("label", "")})
+        print(f"Found {found} dated tab(s) in the document")
+    return out
+
+
+def read_entries(source):
+    """Read one published tab. Rows sharing a Date (plus Season/Label) form one entry. A row's own
+    Date/Season/Label columns win; otherwise the source's values are the default."""
+    if not source.get("csv"):
+        sys.exit(f"Source is missing 'csv': {source}")
     reader = csv.DictReader(io.StringIO(fetch_csv(source["csv"])))
     headers = [h.strip() for h in reader.fieldnames or []]
     lower = {h.lower(): h for h in headers}
     for needed in ("name", "slug"):
         if needed not in lower:
-            sys.exit(f"Missing column '{needed}' in {source['date']}. Found: {headers}")
+            sys.exit(f"Missing column '{needed}'. Found: {headers}")
     # Contributor columns are the ones starting with "from " (e.g. "from Alex").
     cols = [h for h in headers if h.lower().startswith("from ")]
     if not cols:
-        sys.exit(f"No 'from <name>' columns in {source['date']}. Found: {headers}")
-    rows = []
+        sys.exit(f"No 'from <name>' columns found. Found: {headers}")
+    contributors = [c.split(" ", 1)[1] for c in cols]
+    groups = {}
     for raw in reader:
         r = {(k or "").strip(): (v or "").strip() for k, v in raw.items()}
         name = r.get(lower["name"], "")
         if not name:
             continue  # blank spacer row
-        rows.append({
+        date = r.get(lower.get("date", ""), "") or source.get("date", "")
+        if not date:
+            sys.exit(f"'{name}' has no date: fill the Date column or set 'date' in the source.")
+        date = parse_date(date)
+        season = r.get(lower.get("season", ""), "") or source.get("season") or default_season(date)
+        label = r.get(lower.get("label", ""), "") or source.get("label", "")
+        entry = groups.setdefault((season, date, label), {
+            "season": season, "date": date, "label": label,
+            "contributors": contributors, "cols": cols, "rows": []})
+        entry["rows"].append({
             "name": name,
             "slug": r.get(lower["slug"], ""),
             "email": r.get(lower.get("email", ""), ""),
@@ -108,17 +162,14 @@ def read_entry(source):
             "team": name.lower() in TEAM_ROWS,
             "notes": {c: r.get(c, "") for c in cols},
         })
-    return {
-        "season": source["season"], "date": source["date"], "label": source.get("label", ""),
-        "contributors": [c.split(" ", 1)[1] for c in cols], "cols": cols, "rows": rows,
-    }
+    return list(groups.values())
 
 
 def load_entries(args):
     if args.csv:
-        date = args.date or datetime.date.today().isoformat()
-        sources = [{"season": args.season or default_season(date), "date": date,
-                    "label": args.label or "", "csv": args.csv}]
+        # Only pass along what was given; rows with their own Date/Season/Label columns win anyway.
+        sources = [{"csv": args.csv, **{k: v for k, v in (("season", args.season), ("date", args.date),
+                                                              ("label", args.label)) if v}}]
     else:
         raw = os.environ.get("SHEET_SOURCES")
         path = ROOT / "sources.json"
@@ -128,7 +179,7 @@ def load_entries(args):
             sources = json.loads(path.read_text())
         else:
             sys.exit("No sources: add sources.json (see sources.example.json), set SHEET_SOURCES, or pass --csv")
-    entries = [read_entry(s) for s in sources]
+    entries = [e for s in expand_sources(sources) for e in read_entries(s)]
     # Newest first: season, then date.
     entries.sort(key=lambda e: (e["season"], e["date"]), reverse=True)
     return entries
@@ -194,16 +245,15 @@ def render_entry(entry, row, hidden, latest):
     text, statuses = merge_notes(row, entry["cols"])
     if row["summary"]:
         text = row["summary"]
-    body = []
-    if row["shoutout"]:
-        body.append(f'<p class="shoutout"><strong>Shoutout</strong>{html.escape(row["shoutout"])}</p>')
+    personal = []
     if text:
-        body.append(p(text))
+        personal.append(p(text))
     if row["action"]:
-        body.append("<h3>Action items</h3>" + p(row["action"]))
-    if not body:
+        personal.append("<h3>Action items</h3>" + p(row["action"]))
+    if not personal:
         # Status lines (injured, did not attend) only matter when there is no written feedback.
-        body = [p(s, "status") for s in statuses] or [p("No written feedback for this date.", "empty")]
+        personal = [p(s, "status") for s in statuses] or [p("No written feedback for this date.", "empty")]
+    body = personal
 
     team = []
     has_summary_col = any(r["summary"] for r in entry["rows"])
@@ -220,7 +270,7 @@ def render_entry(entry, row, hidden, latest):
             if t_text:
                 team.append(f"<h4>{html.escape(t['name'])}</h4>{p(t_text)}")
     if team:
-        body.append("<h3>Team notes</h3>" + "".join(team))
+        body.append('<div class="team"><h3>Team notes</h3>' + "".join(team) + "</div>")
 
     label = f'<span class="note-label">{html.escape(entry["label"])}</span>' if entry["label"] else ""
     badge = '<span class="badge">Latest</span>' if latest else ""
@@ -250,16 +300,15 @@ def encrypt_payload(data, passphrase):
     key = kdf.derive(passphrase.encode())
     ct = AESGCM(key).encrypt(iv, json.dumps(data).encode(), None)
     enc = lambda b: base64.b64encode(b).decode()
-    blob = json.dumps({"salt": enc(salt), "iv": enc(iv), "ct": enc(ct), "iter": PBKDF2_ITERATIONS})
-    return base64.b64encode(blob.encode()).decode()
+    return json.dumps({"salt": enc(salt), "iv": enc(iv), "ct": enc(ct), "iter": PBKDF2_ITERATIONS})
 
 
 def main():
     load_env()
     ap = argparse.ArgumentParser()
     ap.add_argument("--csv", help="one local CSV instead of sources.json")
-    ap.add_argument("--season", help="with --csv: season label (default: from the date)")
-    ap.add_argument("--date", help="with --csv: ISO date of the feedback (default: today)")
+    ap.add_argument("--season", help="with --csv: default season (default: worked out from each date)")
+    ap.add_argument("--date", help="with --csv: default date for rows without a Date column")
     ap.add_argument("--label", help="with --csv: optional short label, e.g. 'vs SHU'")
     ap.add_argument("--out", default=str(ROOT / "site"))
     ap.add_argument("--strict", action="store_true",
@@ -278,7 +327,6 @@ def main():
         shutil.rmtree(out)
     (out / "f").mkdir(parents=True)
     shutil.copytree(TEMPLATES / "assets", out / "assets")
-    (out / "coaches").mkdir()
     (out / "robots.txt").write_text("User-agent: *\nDisallow: /\n")
     (out / ".nojekyll").write_text("")
     (out / "index.html").write_text((TEMPLATES / "landing.html").read_text())
@@ -293,7 +341,7 @@ def main():
     for player in roster.values():
         (out / "f" / f"{player['slug']}.html").write_text(render_player(player, entries, tpl))
 
-    # Staff dashboard: written ONLY encrypted. Never write the plaintext data to disk.
+    # Staff dashboard: written ONLY encrypted (staff.json), opened from the landing page. Never write the plaintext data to disk.
     passphrase = os.environ.get("DASHBOARD_PASSPHRASE", "")
     if 0 < len(passphrase) < 16:
         print("NOTE: DASHBOARD_PASSPHRASE is under 16 chars; short passphrases can be guessed offline.")
@@ -306,11 +354,8 @@ def main():
                        "notes": [r["notes"][c] for c in e["cols"]] + [r["summary"], r["shoutout"], r["action"]]}
                       for r in e["rows"]]}
             for e in entries]}
-        dash = Template((TEMPLATES / "dashboard.html").read_text())
-        (out / "coaches" / "index.html").write_text(
-            dash.safe_substitute(payload=encrypt_payload(data, passphrase)))
+        (out / "staff.json").write_text(encrypt_payload(data, passphrase))
     else:
-        (out / "coaches").rmdir()
         print(f"WARNING: DASHBOARD_PASSPHRASE missing or under {MIN_PASSPHRASE} chars; dashboard skipped.")
 
     print(f"Built {len(roster)} player pages from {len(entries)} entries -> {out}")
