@@ -94,6 +94,21 @@ def parse_date(text, required=True):
     return None
 
 
+def split_tab_name(name):
+    """A tab name is a date, optionally followed by a label: '10/27/26', '10/27/26 - SHU', '10/27/26 vs SHU'.
+    Returns (iso_date, label) or (None, "")."""
+    name = name.strip()
+    date = parse_date(name, required=False)
+    if date:
+        return date, ""
+    m = re.match(r"^(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|[A-Za-z]+\.? \d{1,2}, \d{4})\s*[-:\u2013\u2014,]?\s*(.*)$", name)
+    if m:
+        date = parse_date(m.group(1), required=False)
+        if date:
+            return date, m.group(2).strip()
+    return None, ""
+
+
 def expand_sources(sources):
     """A source with "document" (the published-document link) turns into one source per tab.
     Each tab's name is its date, e.g. a tab named 10/27/26. Tabs whose name isn't a date are skipped."""
@@ -110,14 +125,16 @@ def expand_sources(sources):
         found = 0
         for raw_name, gid in tabs:
             name = json.loads(f'"{raw_name}"')
-            date = parse_date(name, required=False)
+            date, tab_label = split_tab_name(name)
             if not date:
                 print(f"Skipping tab '{name}': its name isn't a date")
                 continue
             found += 1
             out.append({"csv": f"{base}/pub?gid={gid}&single=true&output=csv", "date": date,
-                        "season": s.get("season", ""), "label": s.get("label", "")})
+                        "season": s.get("season", ""), "label": tab_label or s.get("label", "")})
         print(f"Found {found} dated tab(s) in the document")
+        if not found:
+            sys.exit("No tab name starts with a date, so there is nothing to build. Name tabs like 10/27/26 or 10/27/26 - SHU.")
     return out
 
 
