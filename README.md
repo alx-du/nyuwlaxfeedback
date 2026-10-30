@@ -29,7 +29,7 @@ cp sources.example.json sources.json   # then point it at the real sheet tabs
 
 ## Privacy notes
 
-- A player's page contains only their own feedback. Their code is the page's URL, so treat it like a password and send each player only their own.
+- A player's page contains only their own feedback. Their code (a five-letter word plus three digits, like `tiger482`, a random animal from `animals.txt`, with common objects from `objects.txt` as a fallback) is the page's URL, so treat it like a password and send each player only their own. There are only about 60,000 possible codes, which stops casual guessing but not a determined scanner that requests tens of thousands of URLs.
 - The dashboard is published **encrypted**; the passphrase never leaves your machine and the GitHub secret. Change it if a captain graduates or it's shared too widely.
 - The deploy build runs with `--strict`: it fails if any player lacks a code in the sheet, so a link can never silently change.
 - Pages is public even though the repo code is open, so anyone with a player's code can open that page. That is the intended model.

@@ -36,10 +36,18 @@ TEAM_ROWS = {"defense as a whole", "attack as a whole", "mid", "goalies"}
 EMPTY_NOTES = {"", "no notes", "no comments", "n/a", "none"}
 STATUS_NOTES = {"injured", "did not attend", "did not attend game"}
 PBKDF2_ITERATIONS = 600_000
-SLUG_BYTES = 12  # token_urlsafe(12) -> 16 chars
 
 ROOT = Path(__file__).parent
 TEMPLATES = ROOT / "templates"
+ANIMALS = (ROOT / "animals.txt").read_text().split()
+OBJECTS = (ROOT / "objects.txt").read_text().split()  # fallback once the animals run out
+
+
+def new_slug(used_words=()):
+    """A five-letter word plus three digits, e.g. 'tiger482'. Prefers unused animals, then objects."""
+    pool = ([w for w in ANIMALS if w not in used_words] or [w for w in OBJECTS if w not in used_words]
+            or ANIMALS + OBJECTS)
+    return f"{secrets.choice(pool)}{secrets.randbelow(1000):03d}"
 
 
 def load_env():
@@ -136,14 +144,16 @@ def build_roster(entries):
                         sys.exit(f"Conflicting slugs for {r['name']}: {p[field]} vs {r[field]}")
                     p[field] = r[field]
     used = {p["slug"] for p in roster.values() if p["slug"]}
+    used_words = {s[:-3] for s in used}
     new = []
     for p in roster.values():
         if p["slug"]:
             continue
-        slug = secrets.token_urlsafe(SLUG_BYTES)
+        slug = new_slug(used_words)
         while slug in used:
-            slug = secrets.token_urlsafe(SLUG_BYTES)
+            slug = new_slug(used_words)
         used.add(slug)
+        used_words.add(slug[:-3])
         p["slug"] = slug
         new.append(p)
     return roster, new
