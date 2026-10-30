@@ -349,9 +349,9 @@ def main():
         data = {"entries": [
             {"season": e["season"], "date": e["date"],
              "display": fmt_date(e["date"]) + (f" – {e['label']}" if e["label"] else ""),
-             "contributors": e["contributors"] + ["Summary", "Shoutout", "Action items"],
+             "contributors": e["contributors"] + ["Shoutout/Encouragement", "Summary", "Action items"],
              "rows": [{"name": r["name"], "team": r["team"],
-                       "notes": [r["notes"][c] for c in e["cols"]] + [r["summary"], r["shoutout"], r["action"]]}
+                       "notes": [r["notes"][c] for c in e["cols"]] + [r["shoutout"], r["summary"], r["action"]]}
                       for r in e["rows"]]}
             for e in entries]}
         (out / "staff.json").write_text(encrypt_payload(data, passphrase))

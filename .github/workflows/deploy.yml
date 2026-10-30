@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write   # lets the last step delete the build artifact
   contents: read
   pages: write
   id-token: write
@@ -36,5 +37,18 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
+          retention-days: 1
       - id: deployment
         uses: actions/deploy-pages@v4
+      # The artifact holds every player's page in plain text, and any signed-in GitHub user can
+      # download artifacts from a public repo. The site is already published, so delete it now.
+      - name: Delete the build artifact
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const { data } = await github.rest.actions.listWorkflowRunArtifacts({ owner, repo, run_id: context.runId });
+            for (const a of data.artifacts) {
+              await github.rest.actions.deleteArtifact({ owner, repo, artifact_id: a.id });
+            }
