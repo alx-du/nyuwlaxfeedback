@@ -18,7 +18,7 @@ Each player opens a private page with a personal code. A staff dashboard (passph
 **Local**
 ```
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-cp .env.example .env        # then fill in DASHBOARD_PASSPHRASE (16+ chars, e.g. 4+ random words)
+cp .env.example .env        # then fill in DASHBOARD_PASSPHRASE (16+ chars recommended, e.g. 4+ random words)
 cp sources.example.json sources.json   # then point it at the real sheet tabs
 ```
 

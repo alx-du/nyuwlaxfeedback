@@ -36,6 +36,7 @@ TEAM_ROWS = {"defense as a whole", "attack as a whole", "mid", "goalies"}
 EMPTY_NOTES = {"", "no notes", "no comments", "n/a", "none"}
 STATUS_NOTES = {"injured", "did not attend", "did not attend game"}
 PBKDF2_ITERATIONS = 600_000
+MIN_PASSPHRASE = 8  # hard floor; under 16 prints a warning
 
 ROOT = Path(__file__).parent
 TEMPLATES = ROOT / "templates"
@@ -275,7 +276,9 @@ def main():
 
     # Staff dashboard: written ONLY encrypted. Never write the plaintext data to disk.
     passphrase = os.environ.get("DASHBOARD_PASSPHRASE", "")
-    if len(passphrase) >= 16:
+    if 0 < len(passphrase) < 16:
+        print("NOTE: DASHBOARD_PASSPHRASE is under 16 chars; short passphrases can be guessed offline.")
+    if len(passphrase) >= MIN_PASSPHRASE:
         data = {"entries": [
             {"season": e["season"], "date": e["date"],
              "display": fmt_date(e["date"]) + (f" – {e['label']}" if e["label"] else ""),
@@ -288,7 +291,7 @@ def main():
             dash.safe_substitute(payload=encrypt_payload(data, passphrase)))
     else:
         (out / "coaches").rmdir()
-        print("WARNING: DASHBOARD_PASSPHRASE missing or under 16 chars; dashboard skipped.")
+        print(f"WARNING: DASHBOARD_PASSPHRASE missing or under {MIN_PASSPHRASE} chars; dashboard skipped.")
 
     print(f"Built {len(roster)} player pages from {len(entries)} entries -> {out}")
     if new:
