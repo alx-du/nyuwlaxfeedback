@@ -335,6 +335,7 @@ def main():
     logo = "data:image/png;base64," + base64.b64encode((TEMPLATES / "assets" / "logo.png").read_bytes()).decode()
     (out / "404.html").write_text(Template((TEMPLATES / "404.html").read_text()).safe_substitute(
         css=(TEMPLATES / "assets" / "style.css").read_text(), logo=logo,
+        favicon="data:image/png;base64," + base64.b64encode((TEMPLATES / "assets" / "favicon-32.png").read_bytes()).decode(),
         home=os.environ.get("SITE_URL", "/") or "/"))
 
     tpl = Template((TEMPLATES / "player.html").read_text())

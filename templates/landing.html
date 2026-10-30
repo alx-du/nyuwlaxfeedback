@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Feedback Envelope – NYU Women's Lacrosse</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -32,12 +34,28 @@ async function openDashboard(pass) {
     if (!res.ok) return false;
     var data = await Dash.decrypt(await res.json(), pass);
   } catch (_) { return false; }
-  document.getElementById("gate").hidden = true;
-  var d = document.getElementById("dash"); d.hidden = false;
-  main.classList.add("wide");
+  var d = document.getElementById("dash");
+  d.textContent = "";
+  var back = document.createElement("button");
+  back.type = "button"; back.className = "back-btn"; back.textContent = "\u2190 Back to enter a code";
+  back.addEventListener("click", function () { history.back(); });
+  d.appendChild(back);
   Dash.render(d, data);
+  document.getElementById("gate").hidden = true;
+  d.hidden = false;
+  main.classList.add("wide");
+  history.pushState({ dash: true }, "");  // so the browser's Back button also leaves the dashboard
   return true;
 }
+
+// Leaving the dashboard: drop the decrypted data and show the code box again.
+window.addEventListener("popstate", function () {
+  var d = document.getElementById("dash");
+  d.hidden = true; d.textContent = "";
+  main.classList.remove("wide");
+  document.getElementById("gate").hidden = false;
+  var input = document.getElementById("code"); input.value = ""; input.focus();
+});
 
 document.getElementById("f").addEventListener("submit", async function (e) {
   e.preventDefault();

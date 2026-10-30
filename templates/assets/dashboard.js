@@ -59,7 +59,9 @@ var Dash = (function () {
         if (cb.checked && (r.team || r.notes.some(function (n) { return n; }))) return;
         var tr = el("tr");
         tr.appendChild(el("td", r.name + (r.team ? " (team)" : ""), "name"));
-        r.notes.forEach(function (n) { tr.appendChild(el("td", n)); });
+        r.notes.forEach(function (n, i) {
+          var td = el("td", n); td.setAttribute("data-label", e.contributors[i]); tr.appendChild(td);
+        });
         tbody.appendChild(tr);
       });
     }

@@ -46,3 +46,29 @@ select { font-size: 1rem; padding: .55rem .7rem; border: 2px solid #d6c9e2; bord
 .note-body .team { margin: 2rem -1.25rem -1.25rem; padding: 1.25rem; background: #f3ebf9; border-top: 5px solid var(--violet); }
 .note-body .team h3 { margin: 0 0 .75rem; font-size: 1rem; letter-spacing: .08em; text-transform: uppercase; color: var(--violet); }
 .note-body .team h4 { margin: 1rem 0 .25rem; color: var(--ink); }
+.back-btn { background: #fff; color: var(--violet); border: 2px solid var(--violet); margin-bottom: 1rem; }
+.back-btn:hover { background: var(--violet); color: #fff; }
+
+/* Phones: stack the dashboard table into one card per player and keep controls inside the screen. */
+@media (max-width: 700px) {
+  main { padding: 1rem .75rem 2.5rem; }
+  .picker label { flex: 1 1 0; min-width: 0; }
+  .picker select { width: 100%; min-width: 0; }
+  .toolbar label { display: flex; align-items: center; gap: .4rem; flex: 1 1 40%; min-width: 0; }
+  .toolbar label select { flex: 1; width: 100%; min-width: 0; }
+  .toolbar label { flex: 1 1 100%; }
+  .toolbar label:nth-child(1) select, .toolbar label:nth-child(2) select { margin-left: auto; width: 75%; flex: none; }
+  .toolbar select { padding: .5rem .4rem; }
+  .toolbar input[type=search] { flex: 1 1 100%; }
+  table, thead, tbody, tr, td { display: block; }
+  table { background: none; border-radius: 0; overflow: visible; }
+  thead { display: none; }
+  tr { background: #fff; border-radius: 12px; margin-bottom: 1rem; padding: .75rem 1rem; box-shadow: 0 1px 4px rgba(87, 6, 140, .12); }
+  td { border: 0; padding: .4rem 0; }
+  td:empty { display: none; }
+  td.name { font-size: 1.05rem; padding-top: 0; }
+  td:not(.name)::before { content: attr(data-label); display: block; font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--violet); }
+  .note-head { padding: .7rem 1rem; }
+  .note-body { padding: 1rem; }
+  .note-body .team { margin: 1.5rem -1rem -1rem; padding: 1rem; }
+}
