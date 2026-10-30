@@ -31,7 +31,8 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 # ---- Config (edit these) -------------------------------------------------------------
 TEAM_NAME = "NYU Women's Lacrosse"
 # Rows whose name matches one of these are team-level notes shown on EVERY player's page.
-TEAM_ROWS = {"defense as a whole", "attack as a whole", "mid", "goalies"}
+TEAM_ROWS = {"defense", "attack", "midfield", "goalies", "plan for next practice",
+             "defense as a whole", "attack as a whole", "mid"}
 # Notes that carry no feedback. "Status" notes show as a short line instead of a note.
 EMPTY_NOTES = {"", "no notes", "no comments", "n/a", "none"}
 STATUS_NOTES = {"injured", "did not attend", "did not attend game"}
@@ -102,6 +103,8 @@ def read_entry(source):
             "slug": r.get(lower["slug"], ""),
             "email": r.get(lower.get("email", ""), ""),
             "summary": r.get(lower.get("summary", ""), ""),
+            "shoutout": r.get(next((h for l, h in lower.items() if l.startswith("shoutout")), ""), ""),
+            "action": r.get(next((h for l, h in lower.items() if l.startswith("action item")), ""), ""),
             "team": name.lower() in TEAM_ROWS,
             "notes": {c: r.get(c, "") for c in cols},
         })
@@ -191,13 +194,29 @@ def render_entry(entry, row, hidden, latest):
     text, statuses = merge_notes(row, entry["cols"])
     if row["summary"]:
         text = row["summary"]
-    body = [p(s, "status") for s in statuses]
-    body.append(p(text) if text else p("No written feedback for this date.", "empty"))
+    body = []
+    if row["shoutout"]:
+        body.append(f'<p class="shoutout"><strong>Shoutout</strong>{html.escape(row["shoutout"])}</p>')
+    if text:
+        body.append(p(text))
+    if row["action"]:
+        body.append("<h3>Action items</h3>" + p(row["action"]))
+    if not body:
+        # Status lines (injured, did not attend) only matter when there is no written feedback.
+        body = [p(s, "status") for s in statuses] or [p("No written feedback for this date.", "empty")]
 
     team = []
+    has_summary_col = any(r["summary"] for r in entry["rows"])
     for t in entry["rows"]:
         if t["team"]:
-            t_text, _ = merge_notes(t, entry["cols"])
+            # Team notes come from the Summary column. Tabs with no Summary column at all fall back to
+            # the merged raw notes; a blank summary on a tab that has the column is left out.
+            t_text = t["summary"] if has_summary_col else merge_notes(t, entry["cols"])[0]
+            # Summaries often start with "Defense:"; the heading already says that.
+            prefix = t["name"] + ":"
+            if t_text.lower().startswith(prefix.lower()):
+                t_text = t_text[len(prefix):].strip()
+                t_text = t_text[:1].upper() + t_text[1:]
             if t_text:
                 team.append(f"<h4>{html.escape(t['name'])}</h4>{p(t_text)}")
     if team:
@@ -282,8 +301,9 @@ def main():
         data = {"entries": [
             {"season": e["season"], "date": e["date"],
              "display": fmt_date(e["date"]) + (f" – {e['label']}" if e["label"] else ""),
-             "contributors": e["contributors"],
-             "rows": [{"name": r["name"], "team": r["team"], "notes": [r["notes"][c] for c in e["cols"]]}
+             "contributors": e["contributors"] + ["Summary", "Shoutout", "Action items"],
+             "rows": [{"name": r["name"], "team": r["team"],
+                       "notes": [r["notes"][c] for c in e["cols"]] + [r["summary"], r["shoutout"], r["action"]]}
                       for r in e["rows"]]}
             for e in entries]}
         dash = Template((TEMPLATES / "dashboard.html").read_text())
